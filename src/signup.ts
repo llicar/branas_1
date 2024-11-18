@@ -6,61 +6,65 @@ import { validateCpf } from "./validateCpf";
 const app = express();
 app.use(express.json());
 
+const nameIsValid = (name: string) => {
+	return name.match(/[a-zA-Z] [a-zA-Z]+/);
+}
+const emailIsValid = (email: string) => {
+	return email.match(/^(.+)@(.+)$/);
+}
+const carPlateIsValid = (carPlate: string) => {
+	return carPlate.match(/[A-Z]{3}[0-9]{4}/)
+}
+
 app.post("/signup", async function (req, res) {
-	const input = req.body;
+	const {
+		name,
+		email,
+		cpf,
+		carPlate,
+		password,
+		isPassager,
+		isDriver
+	} = req.body;
 	const connection = pgp()("postgres://postgres:123456@localhost:5432/app");
 	try {
 		const id = crypto.randomUUID();
-		let result;
-		const [acc] = await connection.query("select * from ccca.account where email = $1", [input.email]);
-		if (!acc) {
-
-			if (input.name.match(/[a-zA-Z] [a-zA-Z]+/)) {
-				if (input.email.match(/^(.+)@(.+)$/)) {
-
-					if (validateCpf(input.cpf)) {
-						if (input.isDriver) {
-							if (input.carPlate.match(/[A-Z]{3}[0-9]{4}/)) {
-								await connection.query("insert into ccca.account (account_id, name, email, cpf, car_plate, is_passenger, is_driver, password) values ($1, $2, $3, $4, $5, $6, $7, $8)", [id, input.name, input.email, input.cpf, input.carPlate, !!input.isPassenger, !!input.isDriver, input.password]);
-								
-								const obj = {
-									accountId: id
-								};
-								result = obj;
-							} else {
-								// invalid car plate
-								result = -5;
-							}
-						} else {
-							await connection.query("insert into ccca.account (account_id, name, email, cpf, car_plate, is_passenger, is_driver, password) values ($1, $2, $3, $4, $5, $6, $7, $8)", [id, input.name, input.email, input.cpf, input.carPlate, !!input.isPassenger, !!input.isDriver, input.password]);
-
-							const obj = {
-								accountId: id
-							};
-							result = obj;
-						}
-					} else {
-						// invalid cpf
-						result = -1;
-					}
-				} else {
-					// invalid email
-					result = -2;
-				}
-
-			} else {
-				// invalid name
-				result = -3;
-			}
-
-		} else {
-			// already exists
-			result = -4;
+		const [userExist] = await connection.query("select * from ccca.account where email = $1", [email]);
+		if (userExist) {
+			throw new Error("User already exists");
 		}
-		if (typeof result === "number") {
-			res.status(422).json({ message: result });
-		} else {
-			res.json(result);
+		if (!nameIsValid(name)) {
+			throw new Error("Invalid name");
+		}
+		if (!emailIsValid(email)) {
+			throw new Error("Invalid email");
+		}
+		if (!validateCpf(cpf)) {
+			throw new Error("Invalid cpf");
+		}
+		if (isDriver) {
+			if (!carPlateIsValid(carPlate)) {
+				throw new Error("Invalid Car Plate");
+			}
+		}
+		const arrayDataForRegister = [
+			id,
+			name,
+			email,
+			cpf,
+			carPlate,
+			!!isPassager,
+			!!isDriver,
+			password
+		]
+		await connection.query("insert into ccca.account (account_id, name, email, cpf, car_plate, is_passenger, is_driver, password) values ($1, $2, $3, $4, $5, $6, $7, $8)",arrayDataForRegister);
+		const result = {
+			accountId: id
+		}
+		res.status(200).json({ message: result });
+	} catch(error){
+		if(error instanceof Error){
+			res.status(422).json({ message: error.message });
 		}
 	} finally {
 		await connection.$pool.end();
