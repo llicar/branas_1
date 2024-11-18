@@ -1,10 +1,9 @@
 import crypto from "crypto";
 import pgp from "pg-promise";
-import express from "express";
 import { validateCpf } from "./validateCpf";
+import { Router } from "express";
 
-const app = express();
-app.use(express.json());
+const router = Router()
 
 const nameIsValid = (name: string) => {
 	return name.match(/[a-zA-Z] [a-zA-Z]+/);
@@ -16,7 +15,7 @@ const carPlateIsValid = (carPlate: string) => {
 	return carPlate.match(/[A-Z]{3}[0-9]{4}/)
 }
 
-app.post("/signup", async function (req, res) {
+router.post("/signup", async function (req, res) {
 	const {
 		name,
 		email,
@@ -71,4 +70,4 @@ app.post("/signup", async function (req, res) {
 	}
 });
 
-app.listen(3000);
+export default router
